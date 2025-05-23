@@ -1,0 +1,56 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    font-family: 'JetBrains Mono', monospace;
+  }
+  
+  body {
+    @apply bg-mpc-dark text-white;
+    margin: 0;
+    padding: 0;
+    overflow-x: hidden;
+  }
+  
+  * {
+    box-sizing: border-box;
+  }
+}
+
+@layer components {
+  .pad {
+    @apply bg-mpc-gray border border-mpc-light rounded-lg transition-all duration-75 cursor-pointer select-none;
+    @apply hover:bg-mpc-light active:bg-mpc-accent active:scale-95;
+  }
+  
+  .pad.active {
+    @apply bg-mpc-accent shadow-lg shadow-mpc-accent/50;
+  }
+  
+  .step {
+    @apply w-8 h-8 border border-mpc-light rounded cursor-pointer transition-all duration-75;
+    @apply hover:border-mpc-accent;
+  }
+  
+  .step.active {
+    @apply bg-mpc-accent border-mpc-accent;
+  }
+  
+  .step.current {
+    @apply border-mpc-green border-2;
+  }
+  
+  .slider {
+    @apply appearance-none bg-mpc-gray h-2 rounded-full outline-none;
+  }
+  
+  .slider::-webkit-slider-thumb {
+    @apply appearance-none w-4 h-4 bg-mpc-accent rounded-full cursor-pointer;
+  }
+  
+  .slider::-moz-range-thumb {
+    @apply w-4 h-4 bg-mpc-accent rounded-full cursor-pointer border-0;
+  }
+} 
