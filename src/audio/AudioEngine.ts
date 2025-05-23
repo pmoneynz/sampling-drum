@@ -38,7 +38,6 @@ export class AudioEngine {
   private currentStep = 0;
   private bpm = 120;
   private quantization: Tone.Unit.Time = '16n';
-  private metronomeEnabled = false;
   private metronome: Tone.Player | null = null;
 
   constructor() {
@@ -381,7 +380,6 @@ export class AudioEngine {
   }
 
   private getQuantizedStep(): number {
-    const position = Tone.Transport.position;
     // Convert position to step number based on quantization
     // This is a simplified implementation
     return Math.floor((Tone.Transport.ticks / Tone.Transport.PPQ) * 4) % 16;

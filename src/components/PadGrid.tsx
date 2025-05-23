@@ -92,15 +92,6 @@ export function PadGrid({ audioEngine, selectedPad, onPadSelect }: PadGridProps)
     input.click();
   };
 
-  const handleFileUpload = async (padIndex: number, event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      await audioEngine.loadSample(padIndex, file);
-      // Reset the input so the same file can be uploaded again
-      event.target.value = '';
-    }
-  };
-
   const getKeyForPad = (padIndex: number): string => {
     const key = Object.keys(keyMap).find(k => keyMap[k] === padIndex);
     return key?.toUpperCase() || '';

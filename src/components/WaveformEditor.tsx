@@ -1,7 +1,7 @@
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import WaveSurfer from 'wavesurfer.js';
 import { AudioEngine } from '../audio/AudioEngine';
-import { Play, Square, RotateCcw, Volume2 } from 'lucide-react';
+import { Play, Square, Volume2 } from 'lucide-react';
 
 interface WaveformEditorProps {
   audioEngine: AudioEngine;

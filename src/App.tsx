@@ -1,5 +1,4 @@
-import React, { useState, useEffect } from 'react';
-import { AudioEngine } from './audio/AudioEngine';
+import { useState, useEffect } from 'react';
 import { PadGrid } from './components/PadGrid';
 import { Sequencer } from './components/Sequencer';
 import { WaveformEditor } from './components/WaveformEditor';
@@ -14,7 +13,6 @@ export type View = 'pads' | 'sequencer' | 'waveform' | 'mixer';
 function App() {
   const [currentView, setCurrentView] = useState<View>('pads');
   const [selectedPad, setSelectedPad] = useState<number>(0);
-  const [audioStatus, setAudioStatus] = useState<string>('initializing');
   const audioEngine = useAudioEngine();
 
   useEffect(() => {
@@ -22,10 +20,8 @@ function App() {
     const initAudio = async () => {
       try {
         await audioEngine.init();
-        setAudioStatus('ready');
       } catch (error) {
         console.error('Audio initialization failed:', error);
-        setAudioStatus('error');
       }
     };
     
