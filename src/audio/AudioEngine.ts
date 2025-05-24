@@ -29,6 +29,7 @@ export interface Project {
 
 export class AudioEngine {
   private players: Tone.Player[] = [];
+  private panners: Tone.Panner[] = [];
   private sequence: Tone.Sequence | null = null;
   private samples: Sample[] = [];
   private patterns: Pattern[] = [];
@@ -41,11 +42,15 @@ export class AudioEngine {
   private metronome: Tone.Player | null = null;
 
   constructor() {
-    // Initialize 16 players for the pads with explicit destination connection
+    // Initialize 16 players and panners for the pads
     for (let i = 0; i < 16; i++) {
-      const player = new Tone.Player().toDestination();
+      const panner = new Tone.Panner(0); // Start with center pan
+      const player = new Tone.Player().connect(panner);
+      panner.toDestination();
+      
       player.volume.value = 0; // Start with 0dB (full volume)
       this.players.push(player);
+      this.panners.push(panner);
       
       // Initialize empty sample
       this.samples.push({
@@ -82,17 +87,23 @@ export class AudioEngine {
       // Set master volume
       Tone.getDestination().volume.value = 0; // 0dB = full volume
       
-      console.log('Audio engine initialized');
-      console.log('Audio context state:', Tone.getContext().state);
-      console.log('Sample rate:', Tone.getContext().sampleRate);
+      console.log('🎵 Audio engine initialized');
+      console.log('📊 Audio context state:', Tone.getContext().state);
+      console.log('📊 Sample rate:', Tone.getContext().sampleRate);
+      console.log('📊 Master volume:', Tone.getDestination().volume.value, 'dB');
+      
+      // Test basic audio immediately after init
+      await this.testBasicAudio();
+      
     } catch (error) {
-      console.error('Failed to initialize audio engine:', error);
+      console.error('❌ Failed to initialize audio engine:', error);
     }
   }
 
   dispose() {
     this.stop();
     this.players.forEach(player => player.dispose());
+    this.panners.forEach(panner => panner.dispose());
     if (this.sequence) {
       this.sequence.dispose();
     }
@@ -104,30 +115,45 @@ export class AudioEngine {
   // Sample management
   async loadSample(padIndex: number, file: File): Promise<void> {
     try {
-      console.log(`Loading sample for pad ${padIndex}: ${file.name}`);
+      console.log(`🎵 Loading sample for pad ${padIndex}: ${file.name}`);
+      console.log(`📁 File size: ${(file.size / 1024).toFixed(2)} KB`);
+      console.log(`📁 File type: ${file.type}`);
       
       const arrayBuffer = await file.arrayBuffer();
+      console.log(`✓ ArrayBuffer created: ${arrayBuffer.byteLength} bytes`);
       
       // Ensure audio context is running
       if (Tone.getContext().state !== 'running') {
+        console.log('⚠️ Audio context not running, starting...');
         await Tone.start();
+        console.log(`✓ Audio context started: ${Tone.getContext().state}`);
       }
       
       // Create a proper audio context to decode the buffer
       const audioContext = Tone.getContext().rawContext;
+      console.log('🔧 Decoding audio data...');
       const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+      console.log(`✓ AudioBuffer decoded: ${audioBuffer.duration}s, ${audioBuffer.numberOfChannels} channels`);
       
       // Create ToneAudioBuffer from the decoded AudioBuffer
       const buffer = new Tone.ToneAudioBuffer(audioBuffer);
+      console.log('🔧 Creating ToneAudioBuffer...');
       
       // Wait for the buffer to be ready
       await new Promise<void>((resolve) => {
         if (buffer.loaded) {
+          console.log('✓ ToneAudioBuffer already loaded');
           resolve();
         } else {
-          buffer.onload = () => resolve();
+          console.log('⏳ Waiting for ToneAudioBuffer to load...');
+          buffer.onload = () => {
+            console.log('✓ ToneAudioBuffer loaded');
+            resolve();
+          };
         }
       });
+      
+      console.log(`✓ Buffer ready: duration=${buffer.duration}s, channels=${buffer.numberOfChannels}, sampleRate=${buffer.sampleRate}Hz`);
       
       // Update sample info
       this.samples[padIndex] = {
@@ -138,27 +164,115 @@ export class AudioEngine {
       };
 
       // Dispose old player and create new one with the buffer
+      console.log('🔧 Creating new player with buffer...');
       this.players[padIndex].dispose();
-      this.players[padIndex] = new Tone.Player(buffer).toDestination();
-      this.players[padIndex].volume.value = Tone.gainToDb(this.samples[padIndex].volume);
       
-      console.log(`Sample loaded successfully for pad ${padIndex}: ${file.name}`);
-      console.log(`Buffer duration: ${buffer.duration}s, sample rate: ${buffer.sampleRate}Hz`);
+      // Create new player with the buffer explicitly
+      const newPlayer = new Tone.Player(buffer);
+      this.players[padIndex] = newPlayer;
       
-      // Test playback immediately
+      // Ensure the panner is connected to destination (in case it got disconnected)
+      console.log('🔧 Ensuring panner is connected to destination...');
+      this.panners[padIndex].toDestination();
+      
+      // Connect the player to the existing panner
+      newPlayer.connect(this.panners[padIndex]);
+      
+      // Set volume
+      newPlayer.volume.value = Tone.gainToDb(this.samples[padIndex].volume);
+      
+      // Verify the player has the buffer and connections
+      console.log(`   - New player buffer set: ${!!newPlayer.buffer}`);
+      console.log(`   - New player loaded: ${newPlayer.loaded}`);
+      console.log(`   - Player connected to panner: ${newPlayer.numberOfOutputs > 0}`);
+      console.log(`   - Panner connected to destination: ${this.panners[padIndex].numberOfOutputs > 0}`);
+      
+      console.log(`✓ Player created and connected:`);
+      console.log(`   - Volume: ${this.players[padIndex].volume.value}dB`);
+      console.log(`   - Connected to panner: ${this.panners[padIndex].pan.value}`);
+      console.log(`   - Panner connected to destination: ${this.panners[padIndex].numberOfOutputs > 0}`);
+      
+      console.log(`🎉 Sample loaded successfully for pad ${padIndex}: ${file.name}`);
+      
+      // Debug the complete audio chain
+      console.log('🔧 Debugging audio chain after sample load...');
+      this.debugAudioChain(padIndex);
+      
+      // Test playback immediately with enhanced debugging
+      console.log('🧪 Testing pad audio with loaded sample...');
       this.testPadAudio(padIndex);
       
     } catch (error) {
-      console.error('Error loading sample:', error);
+      console.error(`❌ Error loading sample for pad ${padIndex}:`, error);
+      console.error('Error details:', {
+        name: error instanceof Error ? error.name : 'Unknown',
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
+      });
     }
   }
 
   // Test method to verify audio is working
   testPadAudio(padIndex: number) {
-    console.log(`Testing audio for pad ${padIndex}`);
+    console.log(`🧪 Testing audio for pad ${padIndex}`);
     setTimeout(() => {
       this.triggerPad(padIndex, 0.8);
     }, 100);
+  }
+
+  // Add method to verify audio chain connectivity
+  debugAudioChain(padIndex: number = 0) {
+    console.log(`🔧 Audio Chain Debug for Pad ${padIndex}:`);
+    
+    const player = this.players[padIndex];
+    const panner = this.panners[padIndex];
+    const sample = this.samples[padIndex];
+    
+    console.log(`1. Audio Context:`);
+    console.log(`   - State: ${Tone.getContext().state}`);
+    console.log(`   - Sample Rate: ${Tone.getContext().sampleRate}Hz`);
+    console.log(`   - Current Time: ${Tone.getContext().currentTime.toFixed(3)}s`);
+    
+    console.log(`2. Sample:`);
+    console.log(`   - Has buffer: ${!!sample.buffer}`);
+    console.log(`   - Buffer duration: ${sample.buffer?.duration || 'N/A'}s`);
+    console.log(`   - Sample volume: ${sample.volume}`);
+    console.log(`   - Sample pan: ${sample.pan}`);
+    
+    console.log(`3. Player:`);
+    console.log(`   - State: ${player.state}`);
+    console.log(`   - Loaded: ${player.loaded}`);
+    console.log(`   - Has buffer: ${!!player.buffer}`);
+    console.log(`   - Volume: ${player.volume.value}dB`);
+    
+    console.log(`4. Panner:`);
+    console.log(`   - Pan value: ${panner.pan.value}`);
+    console.log(`   - Number of outputs: ${panner.numberOfOutputs}`);
+    console.log(`   - Connected to destination: ${panner.numberOfOutputs > 0 ? '✅ YES' : '❌ NO'}`);
+    
+    console.log(`5. Master Destination:`);
+    console.log(`   - Volume: ${Tone.getDestination().volume.value}dB`);
+    console.log(`   - Mute: ${Tone.getDestination().mute}`);
+    
+    // Test if player can connect to destination directly (bypass panner)
+    console.log(`6. Testing direct connection...`);
+    if (sample.buffer) {
+      try {
+        const testPlayer = new Tone.Player(sample.buffer).toDestination();
+        testPlayer.volume.value = -6; // Quieter test
+        testPlayer.start();
+        console.log(`   ✓ Direct connection test started`);
+        setTimeout(() => {
+          testPlayer.stop();
+          testPlayer.dispose();
+          console.log(`   ✓ Direct connection test completed`);
+        }, 200);
+      } catch (error) {
+        console.log(`   ❌ Direct connection test failed:`, error);
+      }
+    } else {
+      console.log(`   ⚠️ No buffer available for direct connection test`);
+    }
   }
 
   // Test basic Tone.js audio output
@@ -200,26 +314,31 @@ export class AudioEngine {
 
     // Update player properties
     const player = this.players[padIndex];
+    const panner = this.panners[padIndex];
+    
     if (property === 'volume') {
       player.volume.value = Tone.gainToDb(value);
+    } else if (property === 'pan') {
+      panner.pan.value = value;
     }
   }
 
   // Pad triggering
   triggerPad(padIndex: number, velocity: number = 0.8, time?: Tone.Unit.Time) {
-    console.log(`Attempting to trigger pad ${padIndex} with velocity ${velocity}`);
+    console.log(`🎵 Attempting to trigger pad ${padIndex} with velocity ${velocity}`);
     
     const sample = this.samples[padIndex];
     if (!sample.buffer) {
-      console.warn(`No sample loaded for pad ${padIndex}`);
+      console.warn(`⚠️ No sample loaded for pad ${padIndex}`);
       return;
     }
 
     try {
       // Ensure audio context is running
       if (Tone.getContext().state !== 'running') {
+        console.log('⚠️ Audio context not running, starting and retrying...');
         Tone.start().then(() => {
-          console.log('Audio context started, retrying trigger');
+          console.log('✓ Audio context started, retrying trigger');
           this.triggerPad(padIndex, velocity, time);
         });
         return;
@@ -227,10 +346,17 @@ export class AudioEngine {
 
       const player = this.players[padIndex];
       
+      // Debug player state
+      console.log(`🔍 Player debugging:`);
+      console.log(`   - Player state: ${player.state}`);
+      console.log(`   - Player loaded: ${player.loaded}`);
+      console.log(`   - Player buffer: ${player.buffer ? 'exists' : 'null'}`);
+      console.log(`   - Player buffer duration: ${player.buffer?.duration || 'N/A'}`);
+      
       // Ensure buffer duration is valid
       const bufferDuration = sample.buffer.duration;
       if (!bufferDuration || isNaN(bufferDuration) || bufferDuration <= 0) {
-        console.warn(`Invalid buffer duration for pad ${padIndex}: ${bufferDuration}`);
+        console.warn(`❌ Invalid buffer duration for pad ${padIndex}: ${bufferDuration}`);
         return;
       }
 
@@ -241,7 +367,7 @@ export class AudioEngine {
 
       // Validate calculated values
       if (isNaN(startTime) || isNaN(duration) || duration <= 0) {
-        console.warn(`Invalid timing values for pad ${padIndex}: startTime=${startTime}, duration=${duration}`);
+        console.warn(`❌ Invalid timing values for pad ${padIndex}: startTime=${startTime}, duration=${duration}`);
         return;
       }
 
@@ -249,29 +375,30 @@ export class AudioEngine {
       const finalVolume = Math.max(-60, Tone.gainToDb(velocity * sample.volume));
       player.volume.value = finalVolume;
       
-      console.log(`Triggering pad ${padIndex}:`);
-      console.log(`- Player state before: ${player.state}`);
-      console.log(`- Volume: ${finalVolume}dB (velocity: ${velocity}, sample volume: ${sample.volume})`);
-      console.log(`- Start time: ${startTime.toFixed(3)}s`);
-      console.log(`- Duration: ${duration.toFixed(3)}s`);
-      console.log(`- Audio context state: ${Tone.getContext().state}`);
-      console.log(`- Master volume: ${Tone.getDestination().volume.value}dB`);
+      console.log(`🎵 Triggering pad ${padIndex}:`);
+      console.log(`   - Player state before: ${player.state}`);
+      console.log(`   - Final volume: ${finalVolume}dB (velocity: ${velocity}, sample volume: ${sample.volume})`);
+      console.log(`   - Start time: ${startTime.toFixed(3)}s`);
+      console.log(`   - Duration: ${duration.toFixed(3)}s`);
+      console.log(`   - Audio context state: ${Tone.getContext().state}`);
+      console.log(`   - Master volume: ${Tone.getDestination().volume.value}dB`);
+      console.log(`   - Panner settings: pan=${this.panners[padIndex].pan.value}`);
 
       // Stop any currently playing instance
       if (player.state === 'started') {
         player.stop();
-        console.log(`- Stopped previous playback`);
+        console.log(`   - Stopped previous playback`);
       }
 
       // Start playback with correct Tone.js API
       if (time) {
         // When time is specified (for sequencer)
         player.start(time, startTime, duration);
-        console.log(`- Started with scheduled time: ${time}`);
+        console.log(`   - Started with scheduled time: ${time}`);
       } else {
         // When triggered immediately - use "+0" instead of undefined
         player.start("+0", startTime, duration);
-        console.log(`- Started immediately with offset: ${startTime}s, duration: ${duration}s`);
+        console.log(`   - Started immediately with offset: ${startTime}s, duration: ${duration}s`);
       }
       
       // Add event listeners to track playback
@@ -279,21 +406,36 @@ export class AudioEngine {
         console.log(`🔇 Pad ${padIndex} playback stopped`);
       };
       
-      console.log(`✓ Pad ${padIndex} triggered successfully`);
-      console.log(`- Player state after: ${player.state}`);
+      console.log(`✅ Pad ${padIndex} triggered successfully`);
+      console.log(`   - Player state after: ${player.state}`);
       
       // Additional debugging: Check if audio is actually flowing
       setTimeout(() => {
-        console.log(`- Player state after 50ms: ${player.state}`);
+        console.log(`🔍 Player state after 50ms: ${player.state}`);
         if (player.state !== 'started') {
           console.error(`❌ Player did not start! Current state: ${player.state}`);
+          
+          // Try to diagnose why it didn't start
+          console.log('🔧 Diagnostic information:');
+          console.log(`   - Audio context state: ${Tone.getContext().state}`);
+          console.log(`   - Audio context sample rate: ${Tone.getContext().sampleRate}`);
+          console.log(`   - Buffer exists: ${!!player.buffer}`);
+          console.log(`   - Buffer loaded: ${player.loaded}`);
+          console.log(`   - Master destination: ${Tone.getDestination()}`);
+          console.log(`   - Output connected: ${this.panners[padIndex].numberOfOutputs > 0}`);
+          
         } else {
           console.log(`🔊 Player is running!`);
         }
       }, 50);
 
     } catch (error) {
-      console.error(`Error triggering pad ${padIndex}:`, error);
+      console.error(`❌ Error triggering pad ${padIndex}:`, error);
+      console.error('Error details:', {
+        name: error instanceof Error ? error.name : 'Unknown',
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
+      });
     }
 
     // Record if recording is enabled
@@ -437,6 +579,22 @@ export class AudioEngine {
 
   getSamples(): Sample[] {
     return this.samples;
+  }
+
+  // Master volume controls
+  getMasterVolume(): number {
+    // Convert from dB to linear gain (0-1)
+    return Tone.dbToGain(Tone.getDestination().volume.value);
+  }
+
+  setMasterVolume(volume: number) {
+    // Convert from linear gain (0-1) to dB
+    Tone.getDestination().volume.value = Tone.gainToDb(volume);
+  }
+
+  // Public method to debug audio chain
+  debugAudioChainPublic(padIndex: number = 0) {
+    this.debugAudioChain(padIndex);
   }
 
   // Project management

@@ -138,6 +138,7 @@ export function WaveformEditor({ audioEngine, selectedPad }: WaveformEditorProps
                 ? 'bg-mpc-green text-black' 
                 : 'bg-mpc-light hover:bg-mpc-accent text-white'
             }`}
+            aria-label={isPlaying ? 'Pause' : 'Play'}
           >
             <Play size={16} fill={isPlaying ? 'currentColor' : 'none'} />
           </button>
@@ -145,6 +146,7 @@ export function WaveformEditor({ audioEngine, selectedPad }: WaveformEditorProps
           <button
             onClick={handleStop}
             className="p-2 bg-mpc-light hover:bg-red-600 text-white rounded transition-colors"
+            aria-label="Stop"
           >
             <Square size={16} />
           </button>
@@ -163,8 +165,9 @@ export function WaveformEditor({ audioEngine, selectedPad }: WaveformEditorProps
           <h3 className="text-lg font-semibold">Trim</h3>
           
           <div className="space-y-2">
-            <label className="block text-sm text-gray-400">Start Time</label>
+            <label htmlFor="start-time-slider" className="block text-sm text-gray-400">Start Time</label>
             <input
+              id="start-time-slider"
               type="range"
               min="0"
               max="1"
@@ -174,13 +177,14 @@ export function WaveformEditor({ audioEngine, selectedPad }: WaveformEditorProps
               className="slider w-full"
             />
             <div className="text-xs text-gray-400">
-              {(sample.startTime * (sample.buffer?.duration || 0)).toFixed(2)}s
+              {(sample.startTime * (sample.buffer?.duration || 0)).toFixed(2)}s (start)
             </div>
           </div>
 
           <div className="space-y-2">
-            <label className="block text-sm text-gray-400">End Time</label>
+            <label htmlFor="end-time-slider" className="block text-sm text-gray-400">End Time</label>
             <input
+              id="end-time-slider"
               type="range"
               min="0"
               max="1"
@@ -190,7 +194,7 @@ export function WaveformEditor({ audioEngine, selectedPad }: WaveformEditorProps
               className="slider w-full"
             />
             <div className="text-xs text-gray-400">
-              {(sample.endTime * (sample.buffer?.duration || 0)).toFixed(2)}s
+              {(sample.endTime * (sample.buffer?.duration || 0)).toFixed(2)}s (end)
             </div>
           </div>
         </div>
@@ -210,6 +214,7 @@ export function WaveformEditor({ audioEngine, selectedPad }: WaveformEditorProps
                 value={sample.volume}
                 onChange={(e) => handleVolumeChange(parseFloat(e.target.value))}
                 className="slider flex-1"
+                aria-label="Volume"
               />
             </div>
             <div className="text-xs text-gray-400 text-center">

@@ -196,7 +196,21 @@ export function PadGrid({ audioEngine, selectedPad, onPadSelect }: PadGridProps)
             🔊 Audio will activate on first interaction (required by browsers)
           </p>
         )}
-        <div className="mt-4">
+        <div className="mt-4 flex space-x-2">
+          <button
+            onClick={() => audioEngine.testBasicAudio()}
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors"
+          >
+            Test Basic Audio
+          </button>
+          
+          <button
+            onClick={() => audioEngine.debugAudioChainPublic(selectedPad)}
+            className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded transition-colors"
+          >
+            Debug Audio Chain
+          </button>
+          
           <button
             onClick={async () => {
               await ensureAudioActive();

@@ -8,11 +8,13 @@ interface MixerProps {
 
 export function Mixer({ audioEngine }: MixerProps) {
   const [samples, setSamples] = useState(audioEngine.getSamples());
-  const [masterVolume, setMasterVolume] = useState(0.8);
+  const [masterVolume, setMasterVolume] = useState(audioEngine.getMasterVolume());
 
   useEffect(() => {
     const interval = setInterval(() => {
       setSamples(audioEngine.getSamples());
+      // Sync master volume with audio engine
+      setMasterVolume(audioEngine.getMasterVolume());
     }, 100);
 
     return () => clearInterval(interval);
@@ -26,6 +28,11 @@ export function Mixer({ audioEngine }: MixerProps) {
   const handlePanChange = (padIndex: number, pan: number) => {
     audioEngine.setSampleProperty(padIndex, 'pan', pan);
     setSamples(audioEngine.getSamples());
+  };
+
+  const handleMasterVolumeChange = (volume: number) => {
+    audioEngine.setMasterVolume(volume);
+    setMasterVolume(volume);
   };
 
   const handleMute = (padIndex: number) => {
@@ -53,15 +60,17 @@ export function Mixer({ audioEngine }: MixerProps) {
         <div className="flex items-center space-x-4">
           <div className="flex items-center space-x-2">
             <Volume2 size={20} className="text-gray-400" />
-            <span className="text-sm text-gray-400">Master:</span>
+            <label htmlFor="master-volume" className="text-sm text-gray-400">Master:</label>
             <input
+              id="master-volume"
               type="range"
               min="0"
               max="1"
               step="0.01"
               value={masterVolume}
-              onChange={(e) => setMasterVolume(parseFloat(e.target.value))}
+              onChange={(e) => handleMasterVolumeChange(parseFloat(e.target.value))}
               className="slider w-24"
+              aria-label="Master volume control"
             />
             <span className="text-sm text-gray-400 w-12">
               {Math.round(masterVolume * 100)}%
@@ -95,6 +104,8 @@ export function Mixer({ audioEngine }: MixerProps) {
                   onChange={(e) => handleVolumeChange(index, parseFloat(e.target.value))}
                   className="slider h-24 transform -rotate-90 origin-center"
                   style={{ width: '80px' }}
+                  aria-label={`Volume for ${sample.name || `Pad ${index + 1}`}`}
+                  title={`Volume for ${sample.name || `Pad ${index + 1}`}`}
                 />
                 <div className="text-xs text-center mt-2">
                   {Math.round(sample.volume * 100)}%
@@ -113,6 +124,8 @@ export function Mixer({ audioEngine }: MixerProps) {
                 value={sample.pan}
                 onChange={(e) => handlePanChange(index, parseFloat(e.target.value))}
                 className="slider w-full"
+                aria-label={`Pan control for ${sample.name || `Pad ${index + 1}`}`}
+                title={`Pan control for ${sample.name || `Pad ${index + 1}`}`}
               />
               <div className="text-xs text-center text-gray-400">
                 {sample.pan === 0 ? 'C' : sample.pan > 0 ? `R${Math.round(sample.pan * 100)}` : `L${Math.round(Math.abs(sample.pan) * 100)}`}
