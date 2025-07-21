@@ -13,6 +13,7 @@ export const YouTubeInput: React.FC<YouTubeInputProps> = ({ onVideoLoad, isLoadi
   const [quality, setQuality] = useState<VideoQuality>('720p');
   const [error, setError] = useState<string>('');
   const [isValidating, setIsValidating] = useState(false);
+  const [validationMessage, setValidationMessage] = useState<string>('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,14 +30,50 @@ export const YouTubeInput: React.FC<YouTubeInputProps> = ({ onVideoLoad, isLoadi
     }
 
     setIsValidating(true);
+    setValidationMessage('Contacting YouTube...');
 
     try {
-      const videoInfo = await youtubeService.getVideoInfo(url);
-      onVideoLoad(videoInfo, quality);
-    } catch (error) {
-      setError(error instanceof Error ? error.message : 'Failed to load video');
+      // Add timeout handling for validation
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('Validation timed out. YouTube may be slow or blocking access.')), 15000);
+      });
+
+      setValidationMessage('Checking video availability...');
+      
+      const videoInfo = await Promise.race([
+        youtubeService.getVideoInfo(url),
+        timeoutPromise
+      ]);
+      
+      setValidationMessage('Video validated successfully!');
+      
+      // Small delay to show success message
+      setTimeout(() => {
+        onVideoLoad(videoInfo, quality);
+      }, 500);
+      
+    } catch (error: any) {
+      console.error('Validation error:', error);
+      
+      // Provide more specific error messages
+      if (error.message.includes('timed out')) {
+        setError('YouTube is taking too long to respond. The service may be slow or blocking access. Please try again.');
+      } else if (error.message.includes('Network error') || error.message.includes('fetch')) {
+        setError('Network error. Please check your internet connection and try again.');
+      } else if (error.message.includes('private') || error.message.includes('unavailable')) {
+        setError('This video is private, unavailable, or has been removed from YouTube.');
+      } else if (error.message.includes('age-restricted')) {
+        setError('This video is age-restricted and cannot be accessed.');
+      } else if (error.message.includes('geo') || error.message.includes('region')) {
+        setError('This video is not available in your region.');
+      } else if (error.message.includes('duration') || error.message.includes('10 minute')) {
+        setError('This video exceeds the 10-minute limit. Please choose a shorter video.');
+      } else {
+        setError(error?.message || 'Failed to validate video. Please try a different URL.');
+      }
     } finally {
       setIsValidating(false);
+      setValidationMessage('');
     }
   };
 
@@ -97,6 +134,14 @@ export const YouTubeInput: React.FC<YouTubeInputProps> = ({ onVideoLoad, isLoadi
               )}
             </div>
           </div>
+          
+          {/* Show validation progress message */}
+          {isValidating && validationMessage && (
+            <p className="text-sm text-orange-400 flex items-center space-x-2">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span>{validationMessage}</span>
+            </p>
+          )}
           
           {error && (
             <p className="text-sm text-red-400 flex items-center space-x-2">
@@ -164,6 +209,31 @@ export const YouTubeInput: React.FC<YouTubeInputProps> = ({ onVideoLoad, isLoadi
           <li>• Public videos only</li>
         </ul>
       </div>
+      
+      {/* Add status information for user testing */}
+      {(isValidating || isLoading) && (
+        <div className="mt-4 p-3 bg-blue-900/20 border border-blue-500/30 rounded-lg">
+          <h3 className="text-sm font-medium text-blue-300 mb-2">What's happening:</h3>
+          <ul className="text-xs text-blue-200 space-y-1">
+            {isValidating && (
+              <>
+                <li>• Checking video availability on YouTube</li>
+                <li>• Verifying video duration (max 10 minutes)</li>
+                <li>• Ensuring video is public and accessible</li>
+                <li>• This usually takes 3-10 seconds</li>
+              </>
+            )}
+            {isLoading && (
+              <>
+                <li>• Downloading video and audio files</li>
+                <li>• Processing audio waveform</li>
+                <li>• Setting up playback engine</li>
+                <li>• This may take 30-60 seconds for longer videos</li>
+              </>
+            )}
+          </ul>
+        </div>
+      )}
     </div>
   );
 };

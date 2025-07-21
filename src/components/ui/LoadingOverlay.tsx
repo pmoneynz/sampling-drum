@@ -161,9 +161,9 @@ export const LoadingOverlay: React.FC<LoadingOverlayProps> = ({
           {onCancel && stage !== 'complete' && (
             <button
               onClick={onCancel}
-              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm font-medium transition-colors"
+              className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors"
             >
-              Cancel
+              Cancel Processing
             </button>
           )}
           
@@ -176,6 +176,17 @@ export const LoadingOverlay: React.FC<LoadingOverlayProps> = ({
             </button>
           )}
         </div>
+        
+        {/* Debug info for testing */}
+        {process.env.NODE_ENV === 'development' && (
+          <div className="mt-4 text-xs text-gray-400 bg-gray-800/50 p-3 rounded border border-gray-600">
+            <div>Stage: {stage}</div>
+            <div>Audio: {audioProgress}%</div>
+            <div>Video: {videoProgress}%</div>
+            {speed && <div>Speed: {speed}</div>}
+            {eta && <div>ETA: {eta}</div>}
+          </div>
+        )}
 
         {/* Technical Details */}
         <div className="mt-4 p-3 bg-gray-800 rounded-lg">

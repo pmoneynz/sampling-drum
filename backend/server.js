@@ -164,16 +164,26 @@ app.post('/api/youtube/info', async (req, res) => {
       return res.json(cached);
     }
 
+    // Set up timeout for yt-dlp process
+    const timeout = setTimeout(() => {
+      if (ytDlp && !ytDlp.killed) {
+        ytDlp.kill('SIGTERM');
+        console.log('yt-dlp process timed out and was killed');
+      }
+    }, 12000); // 12 second timeout
+
     const ytDlp = spawn('yt-dlp', [
       '--dump-json',
       '--no-download',
       '--extractor-args', 'youtube:player_skip=configs',
       '--no-warnings',
+      '--socket-timeout', '10',
       url
     ]);
 
     let output = '';
     let errorOutput = '';
+    let processCompleted = false;
 
     ytDlp.stdout.on('data', (data) => {
       output += data.toString();
@@ -184,8 +194,23 @@ app.post('/api/youtube/info', async (req, res) => {
     });
 
     ytDlp.on('close', (code) => {
+      if (processCompleted) return; // Prevent double execution
+      processCompleted = true;
+      clearTimeout(timeout);
+
       if (code !== 0) {
         console.error('yt-dlp error:', errorOutput);
+        
+        // Check for timeout-related errors
+        if (errorOutput.includes('timeout') || errorOutput.includes('timed out')) {
+          return res.status(408).json({
+            error: 'YouTube is taking too long to respond. Please try again.',
+            type: 'TIMEOUT',
+            suggestion: 'Try again in a few moments, or try a different video',
+            technical: 'Request timeout while fetching video information'
+          });
+        }
+        
         const errorInfo = classifyYouTubeError(errorOutput);
         return res.status(400).json({
           error: errorInfo.userMessage,
@@ -229,6 +254,21 @@ app.post('/api/youtube/info', async (req, res) => {
           userMessage: 'Unable to read video information. The video may be unavailable.'
         });
       }
+    });
+
+    // Handle process errors
+    ytDlp.on('error', (error) => {
+      if (processCompleted) return;
+      processCompleted = true;
+      clearTimeout(timeout);
+      
+      console.error('yt-dlp process error:', error);
+      res.status(500).json({
+        error: 'Failed to start video validation process',
+        type: 'PROCESS_ERROR',
+        userMessage: 'Server error during video validation. Please try again.',
+        technical: error.message
+      });
     });
 
   } catch (error) {
