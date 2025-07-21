@@ -97,4 +97,7 @@ Thumbs.db
 .Spotlight-V100
 .Trashes
 ehthumbs.db
-Desktop.ini 
+Desktop.ini core
+backend/downloads/
+backend/sessions.db
+backend/node_modules/
